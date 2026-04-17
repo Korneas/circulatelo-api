@@ -1,4 +1,4 @@
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const WF_SITE_ID = process.env.WF_SITE_ID;
 const WF_API_TOKEN = process.env.WF_API_TOKEN;
