@@ -106,35 +106,58 @@ function normalizeEvent(item) {
   const endDate = toDateOnly(f["fecha-de-final"]);
 
   return {
+    // Core
     id: item.id,
     title: f.name || "",
     slug: f.slug || "",
+    url: f.slug ? `/eventos/${f.slug}` : "#",
+
+    // Dates
     startDate,
     endDate: endDate || startDate,
 
-    image: f["imagen-portada"]?.url || "",
+    // Derived date display fields stored in CMS
+    startDayName: f["dia-inicio---dia"] || "",
+    startDayNum: f["dia-inicio---numero"] || "",
+    startDayMonth: f["dia-inicio---mes"] || "",
+    endDayName: f["dia-final---dia"] || "",
+    endDayNum: f["dia-final---numero"] || "",
+    endDayMonth: f["dia-final---mes"] || "",
+
+    // Main content
     description: f["descripcion"] || "",
-    month: f["mes"] || "",
-    hour: f["hora"] || "",
+    image: f["imagen-portada"]?.url || "",
+    imageAlt: f.name || "",
+
+    // Event meta
+    startTime: f["hora"] || "",
+    endTime: "",
     value: f["valor"] || "",
     price: f["precio"] || "",
-    place: f["lugar"] || "",
+    location: f["lugar"] || "",
     placeLink: f["link-del-lugar"] || "",
     eventType: f["tipo-de-evento"] || "",
-    featured: f["pautado"] || false,
-    featuredStart: f["pautado-inicio"] || "",
-    featuredEnd: f["pautado-fin"] || "",
-    priority: f["prioridad-listado"] || 0,
-    lat: f["latitud"] || "",
-    lng: f["longitud"] || "",
-    contact: f["contacto"] || "",
 
-    // These may come back as references/arrays depending on the API shape
-    neighborhood: f["barrio"] || null,
+    // Template-facing aliases
+    category: f["tipo-de-evento"] || "",
+    place: f["lugar"] || "",
+    neighborhood: f["barrio"] || "",
+
+    // References
+    neighborhoodRef: f["barrio"] || null,
     mainCategory: f["categoria-principal"] || null,
     secondaryCategories: f["categorias-secundarias"] || [],
 
-    url: f.slug ? `/eventos/${f.slug}` : "#",
+    // Featured / sorting
+    featured: !!f["pautado"],
+    featuredStart: toDateOnly(f["pautado-inicio"]),
+    featuredEnd: toDateOnly(f["pautado-fin"]),
+    priority: Number(f["prioridad-listado"] || 0),
+
+    // Extra info
+    lat: f["latitud"] || "",
+    lng: f["longitud"] || "",
+    contact: f["contacto"] || ""
   };
 }
 
