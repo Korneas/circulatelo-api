@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   basePath: "/circulatelo-api",
+  assetPrefix: "/circulatelo-api",
 };
 
 export default nextConfig;
