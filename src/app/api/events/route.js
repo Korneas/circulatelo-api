@@ -102,8 +102,8 @@ function isDateWithinRange(targetDate, startDate, endDate) {
 function normalizeEvent(item) {
   const f = item.fieldData || {};
 
-  const startDate = toDateOnly(f[WF_EVENT_START_FIELD]);
-  const endDate = toDateOnly(f[WF_EVENT_END_FIELD]);
+  const startDate = toDateOnly(f["fecha-de-inicio"]);
+  const endDate = toDateOnly(f["fecha-de-final"]);
 
   return {
     id: item.id,
@@ -111,14 +111,38 @@ function normalizeEvent(item) {
     slug: f.slug || "",
     startDate,
     endDate: endDate || startDate,
-    image: f["main-image"]?.url || f["image"]?.url || "",
-    location: f["location"] || "",
-    startTime: f["start-time"] || "",
-    endTime: f["end-time"] || "",
-    price: f["price"] || "",
-    excerpt: f["short-description"] || f["summary"] || "",
-    url: f.slug ? `/events/${f.slug}` : "#",
+
+    image: f["imagen-portada"]?.url || "",
+    description: f["descripcion"] || "",
+    month: f["mes"] || "",
+    hour: f["hora"] || "",
+    value: f["valor"] || "",
+    price: f["precio"] || "",
+    place: f["lugar"] || "",
+    placeLink: f["link-del-lugar"] || "",
+    eventType: f["tipo-de-evento"] || "",
+    featured: f["pautado"] || false,
+    featuredStart: f["pautado-inicio"] || "",
+    featuredEnd: f["pautado-fin"] || "",
+    priority: f["prioridad-listado"] || 0,
+    lat: f["latitud"] || "",
+    lng: f["longitud"] || "",
+    contact: f["contacto"] || "",
+
+    // These may come back as references/arrays depending on the API shape
+    neighborhood: f["barrio"] || null,
+    mainCategory: f["categoria-principal"] || null,
+    secondaryCategories: f["categorias-secundarias"] || [],
+
+    url: f.slug ? `/eventos/${f.slug}` : "#",
   };
+}
+
+function sortEvents(events) {
+  return [...events].sort((a, b) => {
+    if (a.featured !== b.featured) return a.featured ? -1 : 1;
+    return (b.priority || 0) - (a.priority || 0);
+  });
 }
 
 async function getAllLiveItems(collectionId) {
@@ -172,8 +196,10 @@ export async function GET(request) {
     const events = items.map(normalizeEvent).filter((event) => event.startDate);
 
     if (date) {
-      const filtered = events.filter((event) =>
-        isDateWithinRange(date, event.startDate, event.endDate)
+      const filtered = sortEvents(
+        events.filter((event) =>
+          isDateWithinRange(date, event.startDate, event.endDate)
+        )
       );
 
       return Response.json({
@@ -186,17 +212,31 @@ export async function GET(request) {
     if (month) {
       const days = {};
       const monthPrefix = `${month}-`;
-
-      events.forEach((event) => {
+    
+      sortEvents(events).forEach((event) => {
         const coveredDates = eachDateInRange(event.startDate, event.endDate);
+    
         coveredDates.forEach((coveredDate) => {
-          if (coveredDate.startsWith(monthPrefix)) {
-            if (!days[coveredDate]) days[coveredDate] = 0;
-            days[coveredDate] += 1;
+          if (!coveredDate.startsWith(monthPrefix)) return;
+    
+          if (!days[coveredDate]) {
+            days[coveredDate] = {
+              count: 0,
+              items: []
+            };
           }
+    
+          days[coveredDate].count += 1;
+    
+          days[coveredDate].items.push({
+            id: event.id,
+            title: event.title || "",
+            slug: event.slug || "",
+            url: event.url || "#"
+          });
         });
       });
-
+    
       return Response.json({
         month,
         days,
