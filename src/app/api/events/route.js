@@ -295,18 +295,30 @@ export async function GET(request) {
 
     const eventsCollectionId = await getEventsCollectionId();
 
+    console.log("eventsCollectionId", eventsCollectionId);
+    console.log("WF_BARRIOS_COLLECTION_ID", WF_BARRIOS_COLLECTION_ID || "(missing)");
+    console.log("WF_CATEGORIAS_COLLECTION_ID", WF_CATEGORIAS_COLLECTION_ID || "(missing)");
+
     const [eventItems, barrioItems, categoriaItems, eventsCollectionDetails] = await Promise.all([
       getAllLiveItems(eventsCollectionId),
-      getAllLiveItems(WF_BARRIOS_COLLECTION_ID),
-      getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID),
+      WF_BARRIOS_COLLECTION_ID ? getAllLiveItems(WF_BARRIOS_COLLECTION_ID) : Promise.resolve([]),
+      WF_CATEGORIAS_COLLECTION_ID ? getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID) : Promise.resolve([]),
       getCollectionDetails(eventsCollectionId)
     ]);
+
+    console.log("eventItems", eventItems.length);
+    console.log("barrioItems", barrioItems.length);
+    console.log("categoriaItems", categoriaItems.length);
+    console.log("eventsCollectionDetails fields", eventsCollectionDetails?.fields?.length || 0);
 
     const barriosById = buildBarriosMap(barrioItems);
     const categoriasById = buildCategoriasMap(categoriaItems);
 
     const valorField = getFieldBySlug(eventsCollectionDetails, "valor");
     const tipoEventoField = getFieldBySlug(eventsCollectionDetails, "tipo-de-evento");
+
+    console.log("valorField", valorField?.slug || "(not found)");
+    console.log("tipoEventoField", tipoEventoField?.slug || "(not found)");
 
     const valorOptionsById = buildOptionMap(valorField);
     const tipoEventoOptionsById = buildOptionMap(tipoEventoField);
@@ -372,8 +384,13 @@ export async function GET(request) {
 
     return Response.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
+    console.error("EVENTS API ERROR", error);
+
     return Response.json(
-      { error: error.message || "Unknown error" },
+      {
+        error: error?.message || "Unknown error",
+        stack: error?.stack || ""
+      },
       { status: 500 }
     );
   }
