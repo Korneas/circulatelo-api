@@ -57,6 +57,65 @@ async function getEventsCollectionId() {
   return cachedCollectionId;
 }
 
+async function getCollectionDetails(collectionId) {
+  return webflowFetch(`/v2/collections/${collectionId}`);
+}
+
+function getFieldBySlug(collectionDetails, slug) {
+  const fields = collectionDetails.fields || [];
+  return fields.find((field) => field.slug === slug);
+}
+
+function buildOptionMap(field) {
+  const map = {};
+  const options = field?.validations?.options || [];
+
+  options.forEach((option) => {
+    map[option.id] = option.name;
+  });
+
+  return map;
+}
+
+function buildBarriosMap(items) {
+  const map = {};
+
+  items.forEach((item) => {
+    const f = item.fieldData || {};
+
+    map[item.id] = {
+      id: item.id,
+      name: f.name || "",
+      slug: f.slug || "",
+      zone: f["zona"] || ""
+    };
+  });
+
+  return map;
+}
+
+function buildCategoriasMap(items) {
+  const map = {};
+
+  items.forEach((item) => {
+    const f = item.fieldData || {};
+
+    map[item.id] = {
+      id: item.id,
+      name: f.name || "",
+      slug: f.slug || "",
+      shortDescription: f["descripcion-corta"] || "",
+      order: Number(f["orden-filtro"] || 0),
+      icon: f["icono"]?.url || "",
+      pinColor: f["pin-color"] || "",
+      chipBgColor: f["chip-light-color"] || "",
+      chipTextColor: f["chip-strong-color"] || ""
+    };
+  });
+
+  return map;
+}
+
 function toDateOnly(value) {
   if (!value) return "";
 
@@ -116,6 +175,12 @@ function normalizeEvent(item, refs = {}) {
   const barrio = refs.barriosById?.[barrioId] || null;
   const categoria = refs.categoriasById?.[categoriaId] || null;
 
+  const rawValor = f["valor"] || "";
+  const rawTipoEvento = f["tipo-de-evento"] || "";
+
+  const resolvedValor = refs.valorOptionsById?.[rawValor] || "";
+  const resolvedTipoEvento = refs.tipoEventoOptionsById?.[rawTipoEvento] || "";
+
   return {
     id: item.id,
     title: f.name || "",
@@ -131,25 +196,29 @@ function normalizeEvent(item, refs = {}) {
 
     startTime: f["hora"] || "",
     endTime: "",
-    value: f["valor"] || "",
-    price: f["precio"] || "",
+
+    // this is what should show in the UI
+    value: resolvedValor || "",
+    price: f["precio"] || resolvedValor || "",
+
     location: f["lugar"] || "",
     place: f["lugar"] || "",
     placeLink: f["link-del-lugar"] || "",
 
-    eventType: f["tipo-de-evento"] || "",
+    // keep event type separate
+    eventType: resolvedTipoEvento || "",
 
-    // Resolved barrio
-    neighborhood: barrio?.name || "",
-    neighborhoodZone: barrio?.zone || "",
-    neighborhoodData: barrio,
-
-    // Resolved category
+    // category pill should come from categoria-principal reference
     category: categoria?.name || "",
     categoryData: categoria,
     categoryBgColor: categoria?.chipBgColor || "",
     categoryTextColor: categoria?.chipTextColor || "",
     categoryPinColor: categoria?.pinColor || "",
+
+    // barrio display
+    neighborhood: barrio?.name || "",
+    neighborhoodZone: barrio?.zone || "",
+    neighborhoodData: barrio,
 
     featured: !!f["pautado"],
     featuredStart: toDateOnly(f["pautado-inicio"]),
@@ -160,9 +229,11 @@ function normalizeEvent(item, refs = {}) {
     lng: f["longitud"] || "",
     contact: f["contacto"] || "",
 
-    // Raw refs too, in case you need them later
+    // raw ids for debugging
     barrioId,
     categoriaPrincipalId: categoriaId,
+    rawValor,
+    rawTipoEvento,
     secondaryCategoryIds: Array.isArray(f["categorias-secundarias"])
       ? f["categorias-secundarias"]
       : []
@@ -263,17 +334,31 @@ export async function GET(request) {
 
     const eventsCollectionId = await getEventsCollectionId();
 
-    const [eventItems, barrioItems, categoriaItems] = await Promise.all([
+    const [eventItems, barrioItems, categoriaItems, eventsCollectionDetails] = await Promise.all([
       getAllLiveItems(eventsCollectionId),
-      WF_BARRIOS_COLLECTION_ID ? getAllLiveItems(WF_BARRIOS_COLLECTION_ID) : Promise.resolve([]),
-      WF_CATEGORIAS_COLLECTION_ID ? getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID) : Promise.resolve([])
+      getAllLiveItems(WF_BARRIOS_COLLECTION_ID),
+      getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID),
+      getCollectionDetails(eventsCollectionId)
     ]);
 
     const barriosById = buildBarriosMap(barrioItems);
     const categoriasById = buildCategoriasMap(categoriaItems);
 
+    const valorField = getFieldBySlug(eventsCollectionDetails, "valor");
+    const tipoEventoField = getFieldBySlug(eventsCollectionDetails, "tipo-de-evento");
+
+    const valorOptionsById = buildOptionMap(valorField);
+    const tipoEventoOptionsById = buildOptionMap(tipoEventoField);
+
     const events = eventItems
-      .map((item) => normalizeEvent(item, { barriosById, categoriasById }))
+      .map((item) =>
+        normalizeEvent(item, {
+          barriosById,
+          categoriasById,
+          valorOptionsById,
+          tipoEventoOptionsById
+        })
+      )
       .filter((event) => event.startDate);
 
     if (date) {
