@@ -5,6 +5,11 @@ const WF_API_TOKEN = process.env.WF_API_TOKEN;
 const WF_EVENTS_COLLECTION_NAME = process.env.WF_EVENTS_COLLECTION_NAME || "Events";
 const WF_EVENT_START_FIELD = process.env.WF_EVENT_START_FIELD || "event-start-date";
 const WF_EVENT_END_FIELD = process.env.WF_EVENT_END_FIELD || "event-end-date";
+const WF_BARRIOS_COLLECTION_ID = process.env.WF_BARRIOS_COLLECTION_ID;
+const WF_CATEGORIAS_COLLECTION_ID = process.env.WF_CATEGORIAS_COLLECTION_ID;
+const WF_CATEGORY_BG_FIELD = process.env.WF_CATEGORY_BG_FIELD || "chip-light-color";
+const WF_CATEGORY_TEXT_FIELD = process.env.WF_CATEGORY_TEXT_FIELD || "chip-strong-color";
+const WF_CATEGORY_PIN_FIELD = process.env.WF_CATEGORY_PIN_FIELD || "pin-color";
 
 let cachedCollectionId = null;
 
@@ -53,27 +58,27 @@ async function getEventsCollectionId() {
 }
 
 function toDateOnly(value) {
-    if (!value) return "";
-  
-    // Handles strings like MM-DD-YYYY
-    if (typeof value === "string") {
-      const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-      if (match) {
-        const [, month, day, year] = match;
-        return `${year}-${month}-${day}`;
-      }
+  if (!value) return "";
+
+  // Handles strings like MM-DD-YYYY
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (match) {
+      const [, month, day, year] = match;
+      return `${year}-${month}-${day}`;
     }
-  
-    // Fallback for ISO-like values
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-  
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-  
-    return `${year}-${month}-${day}`;
   }
+
+  // Fallback for ISO-like values
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
 
 function eachDateInRange(startDateStr, endDateStr) {
   const dates = [];
@@ -99,65 +104,68 @@ function isDateWithinRange(targetDate, startDate, endDate) {
   return targetDate >= startDate && targetDate <= effectiveEnd;
 }
 
-function normalizeEvent(item) {
+function normalizeEvent(item, refs = {}) {
   const f = item.fieldData || {};
 
   const startDate = toDateOnly(f["fecha-de-inicio"]);
   const endDate = toDateOnly(f["fecha-de-final"]);
 
+  const barrioId = f["barrio"] || "";
+  const categoriaId = f["categoria-principal"] || "";
+
+  const barrio = refs.barriosById?.[barrioId] || null;
+  const categoria = refs.categoriasById?.[categoriaId] || null;
+
   return {
-    // Core
     id: item.id,
     title: f.name || "",
     slug: f.slug || "",
     url: f.slug ? `/eventos/${f.slug}` : "#",
 
-    // Dates
     startDate,
     endDate: endDate || startDate,
 
-    // Derived date display fields stored in CMS
-    startDayName: f["dia-inicio---dia"] || "",
-    startDayNum: f["dia-inicio---numero"] || "",
-    startDayMonth: f["dia-inicio---mes"] || "",
-    endDayName: f["dia-final---dia"] || "",
-    endDayNum: f["dia-final---numero"] || "",
-    endDayMonth: f["dia-final---mes"] || "",
-
-    // Main content
     description: f["descripcion"] || "",
     image: f["imagen-portada"]?.url || "",
     imageAlt: f.name || "",
 
-    // Event meta
     startTime: f["hora"] || "",
     endTime: "",
     value: f["valor"] || "",
     price: f["precio"] || "",
     location: f["lugar"] || "",
+    place: f["lugar"] || "",
     placeLink: f["link-del-lugar"] || "",
+
     eventType: f["tipo-de-evento"] || "",
 
-    // Template-facing aliases
-    category: f["tipo-de-evento"] || "",
-    place: f["lugar"] || "",
-    neighborhood: f["barrio"] || "",
+    // Resolved barrio
+    neighborhood: barrio?.name || "",
+    neighborhoodZone: barrio?.zone || "",
+    neighborhoodData: barrio,
 
-    // References
-    neighborhoodRef: f["barrio"] || null,
-    mainCategory: f["categoria-principal"] || null,
-    secondaryCategories: f["categorias-secundarias"] || [],
+    // Resolved category
+    category: categoria?.name || "",
+    categoryData: categoria,
+    categoryBgColor: categoria?.chipBgColor || "",
+    categoryTextColor: categoria?.chipTextColor || "",
+    categoryPinColor: categoria?.pinColor || "",
 
-    // Featured / sorting
     featured: !!f["pautado"],
     featuredStart: toDateOnly(f["pautado-inicio"]),
     featuredEnd: toDateOnly(f["pautado-fin"]),
     priority: Number(f["prioridad-listado"] || 0),
 
-    // Extra info
     lat: f["latitud"] || "",
     lng: f["longitud"] || "",
-    contact: f["contacto"] || ""
+    contact: f["contacto"] || "",
+
+    // Raw refs too, in case you need them later
+    barrioId,
+    categoriaPrincipalId: categoriaId,
+    secondaryCategoryIds: Array.isArray(f["categorias-secundarias"])
+      ? f["categorias-secundarias"]
+      : []
   };
 }
 
@@ -194,6 +202,45 @@ async function getAllLiveItems(collectionId) {
   return allItems;
 }
 
+function buildBarriosMap(items) {
+  const map = {};
+
+  items.forEach((item) => {
+    const f = item.fieldData || {};
+
+    map[item.id] = {
+      id: item.id,
+      name: f.name || "",
+      slug: f.slug || "",
+      zone: f["zona"] || ""
+    };
+  });
+
+  return map;
+}
+
+function buildCategoriasMap(items) {
+  const map = {};
+
+  items.forEach((item) => {
+    const f = item.fieldData || {};
+
+    map[item.id] = {
+      id: item.id,
+      name: f.name || "",
+      slug: f.slug || "",
+      shortDescription: f["descripcion-corta"] || "",
+      order: Number(f["orden-filtro"] || 0),
+      icon: f["icono"]?.url || "",
+      pinColor: f[WF_CATEGORY_PIN_FIELD] || "",
+      chipBgColor: f[WF_CATEGORY_BG_FIELD] || "",
+      chipTextColor: f[WF_CATEGORY_TEXT_FIELD] || ""
+    };
+  });
+
+  return map;
+}
+
 export async function GET(request) {
   try {
     if (!WF_SITE_ID || !WF_API_TOKEN) {
@@ -214,9 +261,20 @@ export async function GET(request) {
       );
     }
 
-    const collectionId = await getEventsCollectionId();
-    const items = await getAllLiveItems(collectionId);
-    const events = items.map(normalizeEvent).filter((event) => event.startDate);
+    const eventsCollectionId = await getEventsCollectionId();
+
+    const [eventItems, barrioItems, categoriaItems] = await Promise.all([
+      getAllLiveItems(eventsCollectionId),
+      WF_BARRIOS_COLLECTION_ID ? getAllLiveItems(WF_BARRIOS_COLLECTION_ID) : Promise.resolve([]),
+      WF_CATEGORIAS_COLLECTION_ID ? getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID) : Promise.resolve([])
+    ]);
+
+    const barriosById = buildBarriosMap(barrioItems);
+    const categoriasById = buildCategoriasMap(categoriaItems);
+
+    const events = eventItems
+      .map((item) => normalizeEvent(item, { barriosById, categoriasById }))
+      .filter((event) => event.startDate);
 
     if (date) {
       const filtered = sortEvents(
@@ -235,22 +293,22 @@ export async function GET(request) {
     if (month) {
       const days = {};
       const monthPrefix = `${month}-`;
-    
+
       sortEvents(events).forEach((event) => {
         const coveredDates = eachDateInRange(event.startDate, event.endDate);
-    
+
         coveredDates.forEach((coveredDate) => {
           if (!coveredDate.startsWith(monthPrefix)) return;
-    
+
           if (!days[coveredDate]) {
             days[coveredDate] = {
               count: 0,
               items: []
             };
           }
-    
+
           days[coveredDate].count += 1;
-    
+
           days[coveredDate].items.push({
             id: event.id,
             title: event.title || "",
@@ -259,7 +317,7 @@ export async function GET(request) {
           });
         });
       });
-    
+
       return Response.json({
         month,
         days,
