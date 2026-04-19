@@ -273,23 +273,6 @@ async function getAllLiveItems(collectionId) {
   return allItems;
 }
 
-function buildBarriosMap(items) {
-  const map = {};
-
-  items.forEach((item) => {
-    const f = item.fieldData || {};
-
-    map[item.id] = {
-      id: item.id,
-      name: f.name || "",
-      slug: f.slug || "",
-      zone: f["zona"] || ""
-    };
-  });
-
-  return map;
-}
-
 function buildCategoriasMap(items) {
   const map = {};
 
