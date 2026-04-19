@@ -273,28 +273,6 @@ async function getAllLiveItems(collectionId) {
   return allItems;
 }
 
-function buildCategoriasMap(items) {
-  const map = {};
-
-  items.forEach((item) => {
-    const f = item.fieldData || {};
-
-    map[item.id] = {
-      id: item.id,
-      name: f.name || "",
-      slug: f.slug || "",
-      shortDescription: f["descripcion-corta"] || "",
-      order: Number(f["orden-filtro"] || 0),
-      icon: f["icono"]?.url || "",
-      pinColor: f[WF_CATEGORY_PIN_FIELD] || "",
-      chipBgColor: f[WF_CATEGORY_BG_FIELD] || "",
-      chipTextColor: f[WF_CATEGORY_TEXT_FIELD] || ""
-    };
-  });
-
-  return map;
-}
-
 export async function GET(request) {
   try {
     if (!WF_SITE_ID || !WF_API_TOKEN) {
