@@ -62,8 +62,8 @@ async function getCollectionDetails(collectionId) {
 }
 
 function getFieldBySlug(collectionDetails, slug) {
-  const fields = collectionDetails.fields || [];
-  return fields.find((field) => field.slug === slug);
+  const fields = collectionDetails?.fields || [];
+  return fields.find((field) => field.slug === slug) || null;
 }
 
 function buildOptionMap(field) {
@@ -375,6 +375,15 @@ export async function GET(request) {
           });
         });
       });
+
+      console.log("barriosById count", Object.keys(barriosById).length);
+      console.log("categoriasById count", Object.keys(categoriasById).length);
+      console.log("sample barrio keys", Object.keys(barriosById).slice(0, 5));
+      console.log("sample categoria keys", Object.keys(categoriasById).slice(0, 5));
+      console.log("sample barrio item", JSON.stringify(barrioItems[0], null, 2));
+      console.log("sample categoria item", JSON.stringify(categoriaItems[0], null, 2));
+      console.log("sample raw event barrio", eventItems[0]?.fieldData?.["barrio"]);
+      console.log("sample raw event categoria", eventItems[0]?.fieldData?.["categoria-principal"]);
 
       return Response.json({
         month,
