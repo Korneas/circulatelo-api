@@ -97,13 +97,9 @@ function buildBarriosMap(items) {
 function buildCategoriasMap(items) {
   const map = {};
 
-  items.forEach((item, index) => {
+  items.forEach((item) => {
     const f = item.fieldData || {};
     const key = item.id || item._id || "";
-
-    if (index === 0) {
-      console.log("RAW CATEGORY FIELD DATA", JSON.stringify(f, null, 2));
-    }
 
     if (!key) return;
 
@@ -114,9 +110,10 @@ function buildCategoriasMap(items) {
       shortDescription: f["descripcion-corta"] || "",
       order: Number(f["orden-filtro"] || 0),
       icon: f["icono"]?.url || "",
-      pinColor: f["pin-color"] || "",
-      chipBgColor: f["chip-light-color"] || "",
-      chipTextColor: f["chip-strong-color"] || ""
+
+      pinColor: f["color-chip"] || "",
+      chipBgColor: f["light-color"] || "",
+      chipTextColor: f["chip---strong-color"] || ""
     };
   });
 
