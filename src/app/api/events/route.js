@@ -97,11 +97,18 @@ function buildBarriosMap(items) {
 function buildCategoriasMap(items) {
   const map = {};
 
-  items.forEach((item) => {
+  items.forEach((item, index) => {
     const f = item.fieldData || {};
+    const key = item.id || item._id || "";
 
-    map[item.id] = {
-      id: item.id,
+    if (index === 0) {
+      console.log("RAW CATEGORY FIELD DATA", JSON.stringify(f, null, 2));
+    }
+
+    if (!key) return;
+
+    map[key] = {
+      id: key,
       name: f.name || "",
       slug: f.slug || "",
       shortDescription: f["descripcion-corta"] || "",
@@ -375,15 +382,6 @@ export async function GET(request) {
           });
         });
       });
-
-      console.log("barriosById count", Object.keys(barriosById).length);
-      console.log("categoriasById count", Object.keys(categoriasById).length);
-      console.log("sample barrio keys", Object.keys(barriosById).slice(0, 5));
-      console.log("sample categoria keys", Object.keys(categoriasById).slice(0, 5));
-      console.log("sample barrio item", JSON.stringify(barrioItems[0], null, 2));
-      console.log("sample categoria item", JSON.stringify(categoriaItems[0], null, 2));
-      console.log("sample raw event barrio", eventItems[0]?.fieldData?.["barrio"]);
-      console.log("sample raw event categoria", eventItems[0]?.fieldData?.["categoria-principal"]);
 
       return Response.json({
         month,
