@@ -214,6 +214,7 @@ function normalizeEvent(item, refs = {}) {
 
     // category pill should come from categoria-principal reference
     category: categoria?.name || "",
+    categorySlug: categoria?.slug || "",
     categoryData: categoria,
     categoryBgColor: categoria?.chipBgColor || "",
     categoryTextColor: categoria?.chipTextColor || "",
@@ -375,7 +376,11 @@ export async function GET(request) {
             id: event.id,
             title: event.title || "",
             slug: event.slug || "",
-            url: event.url || "#"
+            url: event.url || "#",
+            category: event.category || "",
+            categorySlug: event.categorySlug || "",
+            categoryBgColor: event.categoryBgColor || "",
+            categoryTextColor: event.categoryTextColor || ""
           });
         });
       });
