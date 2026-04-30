@@ -177,6 +177,12 @@ function normalizeEspacio(item, refs) {
 
 async function getCachedData() {
   const now = Date.now();
+
+  if (espacioItems.length > 0) {
+    console.log("First espacio fieldData keys:", Object.keys(espacioItems[0].fieldData || {}));
+    console.log("First espacio fieldData sample:", JSON.stringify(espacioItems[0].fieldData, null, 2));
+  }
+
   if (cachedItems && cachedRefs && now - cachedAt < CACHE_TTL_MS) {
     return { items: cachedItems, refs: cachedRefs };
   }
