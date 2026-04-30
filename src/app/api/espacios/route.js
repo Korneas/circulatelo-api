@@ -175,6 +175,24 @@ function normalizeEspacio(item, refs) {
   };
 }
 
+async function getCollectionDetails(collectionId) {
+    return webflowFetch(`/v2/collections/${collectionId}`);
+}
+  
+function getFieldBySlug(collectionDetails, slug) {
+    const fields = collectionDetails?.fields || [];
+    return fields.find((field) => field.slug === slug) || null;
+}
+
+function buildOptionMap(field) {
+    const map = {};
+    const options = field?.validations?.options || [];
+    options.forEach((option) => {
+        map[option.id] = option.name;
+    });
+    return map;
+}
+
 async function getCachedData() {
     const now = Date.now();
     if (cachedItems && cachedRefs && now - cachedAt < CACHE_TTL_MS) {
