@@ -118,62 +118,71 @@ function buildCaracteristicasMap(items) {
 }
 
 function normalizeEspacio(item, refs) {
-  const f = item.fieldData || {};
-  const barrio = refs.barriosById[f["barrio"]] || null;
-  const categoria = refs.categoriasById[f["categoria-principal"]] || null;
-
-  const caracteristicaIds = Array.isArray(f["caracteristicas"]) ? f["caracteristicas"] : [];
-  const caracteristicas = caracteristicaIds
-    .map((id) => refs.caracteristicasById[id])
-    .filter(Boolean);
-
-  // fotos may be a single image or an array — handle both
-  const fotos = f["fotos"];
-  const coverImage = Array.isArray(fotos)
-    ? (fotos[0]?.url || "")
-    : (fotos?.url || "");
-
-  return {
-    id: item.id,
-    title: f.name || "",
-    slug: f.slug || "",
-    url: f.slug ? `/espacios/${f.slug}` : "#",
-    description: f["descripcion"] || "",
-    image: coverImage,
-    imageAlt: f.name || "",
-
-    priceLevel: f["nivel-de-precio"] || null,
-    priceMin: f["precio-minimo"] != null ? Number(f["precio-minimo"]) : null,
-    priceMax: f["precio-maximo"] != null ? Number(f["precio-maximo"]) : null,
-
-    googleMapsUrl: f["google-maps-url"] || "",
-    instagramUrl: f["instagram-url"] || "",
-    otherSocialUrl: f["otra-red-social"] || "",
-    horarios: f["horarios"] || "",
-
-    lat: f["latitud"] || "",
-    lng: f["longitud"] || "",
-    zona: f["zona"] || "",
-    verified: !!f["verificado"],
-
-    category: categoria?.name || "",
-    categorySlug: categoria?.slug || "",
-    categoryBgColor: categoria?.chipBgColor || "",
-    categoryTextColor: categoria?.chipTextColor || "",
-
-    neighborhood: barrio?.name || "",
-    neighborhoodSlug: barrio?.slug || "",
-
-    caracteristicas: caracteristicas.map((c) => ({
-      name: c.name,
-      slug: c.slug,
-      icon: c.icon,
-    })),
-    caracteristicaSlugs: caracteristicas.map((c) => c.slug),
-
-    featured: !!f["pautado"],
-  };
-}
+    const f = item.fieldData || {};
+  
+    // Reference fields
+    const barrio = refs.barriosById[f["barrio"]] || null;
+    const categoria = refs.categoriasById[f["categoria-principal"]] || null;
+  
+    const caracteristicaIds = Array.isArray(f["caracteristicas"]) ? f["caracteristicas"] : [];
+    const caracteristicas = caracteristicaIds
+      .map((id) => refs.caracteristicasById[id])
+      .filter(Boolean);
+  
+    // Option fields — Webflow returns IDs, resolve to names
+    const rawPriceLevel = f["nivel-de-precio"];
+    const priceLevel = rawPriceLevel ? (refs.nivelPrecioOptions?.[rawPriceLevel] || null) : null;
+  
+    const rawZona = f["zona"];
+    const zona = rawZona ? (refs.zonaOptions?.[rawZona] || null) : null;
+  
+    // Image — handle single image or multi-image array
+    const fotos = f["fotos"];
+    const coverImage = Array.isArray(fotos)
+      ? (fotos[0]?.url || "")
+      : (fotos?.url || "");
+  
+    return {
+      id: item.id,
+      title: f.name || "",
+      slug: f.slug || "",
+      url: f.slug ? `/espacios/${f.slug}` : "#",
+      description: f["descripcion"] || "",
+      image: coverImage,
+      imageAlt: f.name || "",
+  
+      priceLevel,
+      priceMin: f["precio-minimo"] != null ? Number(f["precio-minimo"]) : null,
+      priceMax: f["precio-maximo"] != null ? Number(f["precio-maximo"]) : null,
+  
+      googleMapsUrl: f["google-maps-url"] || "",
+      instagramUrl: f["instagram-url"] || "",
+      otherSocialUrl: f["otra-red-social"] || "",
+      horarios: f["horarios"] || "",
+  
+      lat: f["latitud-2"] || f["latitud"] || "",
+      lng: f["longitud-2"] || f["longitud"] || "",
+      zona,
+      verified: !!f["verificado"],
+  
+      category: categoria?.name || "",
+      categorySlug: categoria?.slug || "",
+      categoryBgColor: categoria?.chipBgColor || "",
+      categoryTextColor: categoria?.chipTextColor || "",
+  
+      neighborhood: barrio?.name || "",
+      neighborhoodSlug: barrio?.slug || "",
+  
+      caracteristicas: caracteristicas.map((c) => ({
+        name: c.name,
+        slug: c.slug,
+        icon: c.icon,
+      })),
+      caracteristicaSlugs: caracteristicas.map((c) => c.slug),
+  
+      featured: !!f["pautado"],
+    };
+  }
 
 async function getCollectionDetails(collectionId) {
     return webflowFetch(`/v2/collections/${collectionId}`);
