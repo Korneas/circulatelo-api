@@ -128,6 +128,22 @@ function normalizeEspacio(item, refs) {
     const caracteristicas = caracteristicaIds
       .map((id) => refs.caracteristicasById[id])
       .filter(Boolean);
+
+    const categoriaPrincipal = refs.categoriasById[f["categoria-principal"]] || null;
+
+    const categoriasSecundariasIds = Array.isArray(f["categoria-secundaria"])
+      ? f["categoria-secundaria"]
+      : [];
+    
+    const categoriasSecundarias = categoriasSecundariasIds
+      .map((id) => refs.categoriasById[id])
+      .filter(Boolean);
+    
+    // All categories this espacio belongs to (primary + secondary)
+    const allCategorySlugs = [
+      categoriaPrincipal?.slug,
+      ...categoriasSecundarias.map((c) => c.slug),
+    ].filter(Boolean);
   
     // Option fields — Webflow returns IDs, resolve to names
     const rawPriceLevel = f["nivel-de-precio"];
@@ -165,10 +181,11 @@ function normalizeEspacio(item, refs) {
       zona,
       verified: !!f["verificado"],
   
-      category: categoria?.name || "",
-      categorySlug: categoria?.slug || "",
-      categoryBgColor: categoria?.chipBgColor || "",
-      categoryTextColor: categoria?.chipTextColor || "",
+      category: categoriaPrincipal?.name || "",
+      categorySlug: categoriaPrincipal?.slug || "",
+      categorySlugs: allCategorySlugs,  // ← new field, primary + secondary
+      categoryBgColor: categoriaPrincipal?.chipBgColor || "",
+      categoryTextColor: categoriaPrincipal?.chipTextColor || "",
   
       neighborhood: barrio?.name || "",
       neighborhoodSlug: barrio?.slug || "",
@@ -261,7 +278,13 @@ function applyFilters(espacios, params) {
   const search = (params.get("search") || "").trim().toLowerCase();
 
   return espacios.filter((e) => {
-    if (categorias.length && !categorias.includes(e.categorySlug)) return false;
+    if (categorias.length) {
+      // Match if espacio belongs to ANY of the selected categories (primary or secondary)
+      const matchesCategoria = categorias.some((slug) =>
+        e.categorySlugs.includes(slug)
+      );
+      if (!matchesCategoria) return false;
+    }
 
     if (priceLevels.length) {
       // Espacios without a price level are excluded when a price filter is active
@@ -343,17 +366,38 @@ export async function GET(request) {
     const response = { page, pageSize, total, hasMore, items: pageItems };
 
     if (includeFacets) {
+      // Helper: apply all filters EXCEPT the one we're computing facets for
+      const applyExcluding = (excludeKey) => {
+        const filteredParams = new URLSearchParams();
+        searchParams.forEach((value, key) => {
+          if (key !== excludeKey) filteredParams.append(key, value);
+        });
+        return applyFilters(espacios, filteredParams);
+      };
+    
+      const espaciosForCategoriaFacets = applyExcluding("categoria");
+      const espaciosForCaracteristicaFacets = applyExcluding("caracteristica");
+      const espaciosForPriceFacets = applyExcluding("priceLevel");
+    
       response.facets = {
         categorias: Object.values(refs.categoriasById).map((c) => ({
           slug: c.slug,
           name: c.name,
-          count: espacios.filter((e) => e.categorySlug === c.slug).length,
+          count: espaciosForCategoriaFacets.filter((e) =>
+            e.categorySlugs.includes(c.slug)
+          ).length,
         })),
         caracteristicas: Object.values(refs.caracteristicasById).map((c) => ({
           slug: c.slug,
           name: c.name,
           tipo: c.tipo,
-          count: espacios.filter((e) => e.caracteristicaSlugs.includes(c.slug)).length,
+          count: espaciosForCaracteristicaFacets.filter((e) =>
+            e.caracteristicaSlugs.includes(c.slug)
+          ).length,
+        })),
+        priceLevels: ["Gratis", "$", "$$", "$$$", "Variable"].map((level) => ({
+          value: level,
+          count: espaciosForPriceFacets.filter((e) => e.priceLevel === level).length,
         })),
       };
     }
