@@ -244,19 +244,6 @@ async function getCachedData() {
       getCollectionDetails(espaciosCollectionId),
     ]);
   
-    // Debug logs go HERE — after Promise.all resolves
-    console.log("espacioItems:", espacioItems.length);
-    console.log("barrioItems:", barrioItems.length);
-    if (espacioItems[0]) {
-      console.log("Sample fieldData keys:", Object.keys(espacioItems[0].fieldData || {}));
-      console.log("Sample fieldData:", JSON.stringify(espacioItems[0].fieldData, null, 2));
-    }
-  
-    const nivelPrecioField = getFieldBySlug(espaciosCollectionDetails, "nivel-de-precio");
-    const zonaField = getFieldBySlug(espaciosCollectionDetails, "zona");
-    console.log("nivel-de-precio field found:", !!nivelPrecioField);
-    console.log("zona field found:", !!zonaField);
-  
     const refs = {
       barriosById: buildBarriosMap(barrioItems),
       categoriasById: buildCategoriasMap(categoriaItems),

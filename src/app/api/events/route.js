@@ -300,10 +300,6 @@ export async function GET(request) {
 
     const eventsCollectionId = await getEventsCollectionId();
 
-    console.log("eventsCollectionId", eventsCollectionId);
-    console.log("WF_BARRIOS_COLLECTION_ID", WF_BARRIOS_COLLECTION_ID || "(missing)");
-    console.log("WF_CATEGORIAS_COLLECTION_ID", WF_CATEGORIAS_COLLECTION_ID || "(missing)");
-
     const [eventItems, barrioItems, categoriaItems, eventsCollectionDetails] = await Promise.all([
       getAllLiveItems(eventsCollectionId),
       WF_BARRIOS_COLLECTION_ID ? getAllLiveItems(WF_BARRIOS_COLLECTION_ID) : Promise.resolve([]),
@@ -311,19 +307,11 @@ export async function GET(request) {
       getCollectionDetails(eventsCollectionId)
     ]);
 
-    console.log("eventItems", eventItems.length);
-    console.log("barrioItems", barrioItems.length);
-    console.log("categoriaItems", categoriaItems.length);
-    console.log("eventsCollectionDetails fields", eventsCollectionDetails?.fields?.length || 0);
-
     const barriosById = buildBarriosMap(barrioItems);
     const categoriasById = buildCategoriasMap(categoriaItems);
 
     const valorField = getFieldBySlug(eventsCollectionDetails, "valor");
     const tipoEventoField = getFieldBySlug(eventsCollectionDetails, "tipo-de-evento");
-
-    console.log("valorField", valorField?.slug || "(not found)");
-    console.log("tipoEventoField", tipoEventoField?.slug || "(not found)");
 
     const valorOptionsById = buildOptionMap(valorField);
     const tipoEventoOptionsById = buildOptionMap(tipoEventoField);
