@@ -211,52 +211,56 @@ function getFieldBySlug(collectionDetails, slug) {
 }
 
 function buildOptionMap(field) {
-    const map = {};
-    const options = field?.validations?.options || [];
-    options.forEach((option) => {
-        map[option.id] = option.name;
-    });
-    return map;
+  if (!field) return {};
+  const map = {};
+  const options = field?.validations?.options || [];
+  options.forEach((option) => {
+    map[option.id] = option.name;
+  });
+  return map;
 }
 
 async function getCachedData() {
-    const now = Date.now();
-    if (cachedItems && cachedRefs && now - cachedAt < CACHE_TTL_MS) {
-      return { items: cachedItems, refs: cachedRefs };
-    }
-  
-    const espaciosCollectionId = await getEspaciosCollectionId();
-    
-    // Promise.all must come BEFORE any reference to espacioItems
-    const [
-      espacioItems,
-      barrioItems,
-      categoriaItems,
-      caracteristicaItems,
-      espaciosCollectionDetails,
-    ] = await Promise.all([
-      getAllLiveItems(espaciosCollectionId),
-      WF_BARRIOS_COLLECTION_ID ? getAllLiveItems(WF_BARRIOS_COLLECTION_ID) : Promise.resolve([]),
-      WF_CATEGORIAS_COLLECTION_ID ? getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID) : Promise.resolve([]),
-      WF_CARACTERISTICAS_COLLECTION_ID
-        ? getAllLiveItems(WF_CARACTERISTICAS_COLLECTION_ID)
-        : Promise.resolve([]),
-      getCollectionDetails(espaciosCollectionId),
-    ]);
-  
-    const refs = {
-      barriosById: buildBarriosMap(barrioItems),
-      categoriasById: buildCategoriasMap(categoriaItems),
-      caracteristicasById: buildCaracteristicasMap(caracteristicaItems),
-      nivelPrecioOptions: buildOptionMap(nivelPrecioField),
-      zonaOptions: buildOptionMap(zonaField),
-    };
-  
-    cachedItems = espacioItems;
-    cachedRefs = refs;
-    cachedAt = now;
-    return { items: espacioItems, refs };
+  const now = Date.now();
+  if (cachedItems && cachedRefs && now - cachedAt < CACHE_TTL_MS) {
+    return { items: cachedItems, refs: cachedRefs };
   }
+
+  const espaciosCollectionId = await getEspaciosCollectionId();
+
+  const [
+    espacioItems,
+    barrioItems,
+    categoriaItems,
+    caracteristicaItems,
+    espaciosCollectionDetails,
+  ] = await Promise.all([
+    getAllLiveItems(espaciosCollectionId),
+    WF_BARRIOS_COLLECTION_ID ? getAllLiveItems(WF_BARRIOS_COLLECTION_ID) : Promise.resolve([]),
+    WF_CATEGORIAS_COLLECTION_ID ? getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID) : Promise.resolve([]),
+    WF_CARACTERISTICAS_COLLECTION_ID
+      ? getAllLiveItems(WF_CARACTERISTICAS_COLLECTION_ID)
+      : Promise.resolve([]),
+    getCollectionDetails(espaciosCollectionId),
+  ]);
+
+  // ⬇️ THESE TWO LINES WERE MISSING — that's the bug
+  const nivelPrecioField = getFieldBySlug(espaciosCollectionDetails, "nivel-de-precio");
+  const zonaField = getFieldBySlug(espaciosCollectionDetails, "zona");
+
+  const refs = {
+    barriosById: buildBarriosMap(barrioItems),
+    categoriasById: buildCategoriasMap(categoriaItems),
+    caracteristicasById: buildCaracteristicasMap(caracteristicaItems),
+    nivelPrecioOptions: buildOptionMap(nivelPrecioField),
+    zonaOptions: buildOptionMap(zonaField),
+  };
+
+  cachedItems = espacioItems;
+  cachedRefs = refs;
+  cachedAt = now;
+  return { items: espacioItems, refs };
+}
 
 function applyFilters(espacios, params) {
   const categorias = params.getAll("categoria").filter(Boolean);
