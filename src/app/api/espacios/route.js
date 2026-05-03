@@ -389,7 +389,12 @@ export async function GET(request) {
       };
     }
 
-    return Response.json(response);
+    return Response.json(response, {
+      headers: {
+        "Cache-Control": "public, max-age=60, s-maxage=300",
+        "CDN-Cache-Control": "public, max-age=300"
+      }
+    });
   } catch (error) {
     console.error("ESPACIOS API ERROR", error);
     return Response.json(
