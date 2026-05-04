@@ -345,6 +345,9 @@ export async function GET(request) {
       const days = {};
       const monthPrefix = `${month}-`;
 
+      // Push the FULL normalized event object into each day's items array.
+      // This lets the calendar UI render full event cards from a single
+      // /api/events?month=YYYY-MM request, with no additional per-day fetches.
       sortEvents(events).forEach((event) => {
         const coveredDates = eachDateInRange(event.startDate, event.endDate);
 
@@ -359,17 +362,7 @@ export async function GET(request) {
           }
 
           days[coveredDate].count += 1;
-
-          days[coveredDate].items.push({
-            id: event.id,
-            title: event.title || "",
-            slug: event.slug || "",
-            url: event.url || "#",
-            category: event.category || "",
-            categorySlug: event.categorySlug || "",
-            categoryBgColor: event.categoryBgColor || "",
-            categoryTextColor: event.categoryTextColor || ""
-          });
+          days[coveredDate].items.push(event);
         });
       });
 
