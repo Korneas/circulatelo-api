@@ -112,15 +112,31 @@ function toDateOnly(value) {
   return `${year}-${month}-${day}`;
 }
 
+// Returns YYYY-MM-DD for the Monday and Sunday bracketing `date`.
+// Week runs Monday → Sunday. If `date` is itself Sunday, the week ends on
+// that Sunday (i.e., we look back to the prior Monday, not forward to the
+// next one). This matches "Monday through Sunday" intuition.
+function getWeekRange(date) {
+  // JS getDay(): 0=Sun, 1=Mon, ..., 6=Sat. We want a 0=Mon offset.
+  const dayOfWeek = date.getDay();
+  const offsetFromMonday = (dayOfWeek + 6) % 7;
+
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - offsetFromMonday);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+
+  return { weekStart: toDateOnly(monday), weekEnd: toDateOnly(sunday) };
+}
+
 function computeEventCounts(eventItems) {
   // "Today" boundaries based on local server time. Webflow stores dates as
   // calendar dates without timezones, so we compare YYYY-MM-DD strings.
   const now = new Date();
   const todayKey = toDateOnly(now);
   const monthPrefix = todayKey.slice(0, 7); // "YYYY-MM"
+  const { weekStart, weekEnd } = getWeekRange(now);
 
   let eventsThisMonth = 0;
-  let eventsUpcoming = 0;
+  let eventsThisWeek = 0;
 
   eventItems.forEach((item) => {
     const f = item.fieldData || {};
@@ -131,23 +147,22 @@ function computeEventCounts(eventItems) {
 
     // Events this month: any event whose range touches the current calendar
     // month (regardless of whether it's already happened).
-    // Range overlaps [first-of-month, last-of-month] iff
-    //   startDate <= last-of-month AND endDate >= first-of-month.
-    // We only need to compare the YYYY-MM prefix: a range overlaps the
-    // current month iff start's month <= current month <= end's month.
+    // We compare YYYY-MM prefixes — a range overlaps the current month iff
+    // start's month <= current month <= end's month.
     const startMonth = startDate.slice(0, 7);
     const endMonth = endDate.slice(0, 7);
     if (startMonth <= monthPrefix && endMonth >= monthPrefix) {
       eventsThisMonth++;
     }
 
-    // Upcoming events: end date is today or later.
-    if (endDate >= todayKey) {
-      eventsUpcoming++;
+    // Events this week: range overlaps [weekStart, weekEnd].
+    // Overlap iff startDate <= weekEnd AND endDate >= weekStart.
+    if (startDate <= weekEnd && endDate >= weekStart) {
+      eventsThisWeek++;
     }
   });
 
-  return { eventsThisMonth, eventsUpcoming };
+  return { eventsThisMonth, eventsThisWeek };
 }
 
 async function buildStats() {
@@ -163,12 +178,12 @@ async function buildStats() {
     getAllLiveItems(eventsCollectionId),
   ]);
 
-  const { eventsThisMonth, eventsUpcoming } = computeEventCounts(eventItems);
+  const { eventsThisMonth, eventsThisWeek } = computeEventCounts(eventItems);
 
   return {
     spaces,
     eventsThisMonth,
-    eventsUpcoming,
+    eventsThisWeek,
     generatedAt: new Date().toISOString(),
   };
 }
