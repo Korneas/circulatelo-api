@@ -183,9 +183,13 @@ function normalizeEspacio(item, refs) {
   
       category: categoriaPrincipal?.name || "",
       categorySlug: categoriaPrincipal?.slug || "",
-      categorySlugs: allCategorySlugs,  // ← new field, primary + secondary
+      categorySlugs: allCategorySlugs,  // primary + secondary
       categoryBgColor: categoriaPrincipal?.chipBgColor || "",
       categoryTextColor: categoriaPrincipal?.chipTextColor || "",
+
+      // Map-marker fields (used by the homepage map)
+      pinColor: categoriaPrincipal?.pinColor || "#C1560C",
+      categoryIcon: categoriaPrincipal?.icon || "",
   
       neighborhood: barrio?.name || "",
       neighborhoodSlug: barrio?.slug || "",
@@ -244,7 +248,6 @@ async function getCachedData() {
     getCollectionDetails(espaciosCollectionId),
   ]);
 
-  // ⬇️ THESE TWO LINES WERE MISSING — that's the bug
   const nivelPrecioField = getFieldBySlug(espaciosCollectionDetails, "nivel-de-precio");
   const zonaField = getFieldBySlug(espaciosCollectionDetails, "zona");
 
@@ -336,6 +339,7 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const fetchAll = searchParams.get("all") === "true";
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.min(
       50,
@@ -350,11 +354,33 @@ export async function GET(request) {
     const sorted = applySort(filtered, sort);
 
     const total = sorted.length;
-    const start = (page - 1) * pageSize;
-    const pageItems = sorted.slice(start, start + pageSize);
-    const hasMore = start + pageSize < total;
 
-    const response = { page, pageSize, total, hasMore, items: pageItems };
+    // ?all=true returns the full result set without pagination.
+    // Used by the homepage map, which needs every marker up front.
+    let pageItems;
+    let hasMore;
+    let responsePage;
+    let responsePageSize;
+    if (fetchAll) {
+      pageItems = sorted;
+      hasMore = false;
+      responsePage = 1;
+      responsePageSize = total;
+    } else {
+      const start = (page - 1) * pageSize;
+      pageItems = sorted.slice(start, start + pageSize);
+      hasMore = start + pageSize < total;
+      responsePage = page;
+      responsePageSize = pageSize;
+    }
+
+    const response = {
+      page: responsePage,
+      pageSize: responsePageSize,
+      total,
+      hasMore,
+      items: pageItems,
+    };
 
     if (includeFacets) {
       // Helper: apply all filters EXCEPT the one we're computing facets for
