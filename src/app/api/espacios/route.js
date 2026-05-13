@@ -5,6 +5,7 @@ const WF_API_TOKEN = process.env.WF_API_TOKEN;
 const WF_BARRIOS_COLLECTION_ID = process.env.WF_BARRIOS_COLLECTION_ID;
 const WF_CATEGORIAS_COLLECTION_ID = process.env.WF_CATEGORIAS_COLLECTION_ID;
 const WF_CARACTERISTICAS_COLLECTION_ID = process.env.WF_CARACTERISTICAS_COLLECTION_ID;
+const WF_TIPOS_ESPACIO_COLLECTION_ID = process.env.WF_TIPOS_ESPACIO_COLLECTION_ID;
 
 const ESPACIOS_COLLECTION_NAME = "Espacios";
 const PAGE_SIZE_DEFAULT = 18;
@@ -117,12 +118,26 @@ function buildCaracteristicasMap(items) {
   return map;
 }
 
+function buildTiposEspacioMap(items) {
+  const map = {};
+  items.forEach((item) => {
+    const f = item.fieldData || {};
+    map[item.id] = {
+      id: item.id,
+      name: f.name || "",
+      slug: f.slug || "",
+    };
+  });
+  return map;
+}
+
 function normalizeEspacio(item, refs) {
     const f = item.fieldData || {};
   
     // Reference fields
     const barrio = refs.barriosById[f["barrio"]] || null;
     const categoria = refs.categoriasById[f["categoria-principal"]] || null;
+    const tipoEspacio = refs.tiposEspacioById[f["tipo-de-espacio"]] || null;
   
     const caracteristicaIds = Array.isArray(f["caracteristicas"]) ? f["caracteristicas"] : [];
     const caracteristicas = caracteristicaIds
@@ -193,6 +208,9 @@ function normalizeEspacio(item, refs) {
   
       neighborhood: barrio?.name || "",
       neighborhoodSlug: barrio?.slug || "",
+
+      spaceType: tipoEspacio?.name || "",
+      spaceTypeSlug: tipoEspacio?.slug || "",
   
       caracteristicas: caracteristicas.map((c) => ({
         name: c.name,
@@ -237,6 +255,7 @@ async function getCachedData() {
     barrioItems,
     categoriaItems,
     caracteristicaItems,
+    tipoEspacioItems,
     espaciosCollectionDetails,
   ] = await Promise.all([
     getAllLiveItems(espaciosCollectionId),
@@ -244,6 +263,9 @@ async function getCachedData() {
     WF_CATEGORIAS_COLLECTION_ID ? getAllLiveItems(WF_CATEGORIAS_COLLECTION_ID) : Promise.resolve([]),
     WF_CARACTERISTICAS_COLLECTION_ID
       ? getAllLiveItems(WF_CARACTERISTICAS_COLLECTION_ID)
+      : Promise.resolve([]),
+    WF_TIPOS_ESPACIO_COLLECTION_ID
+      ? getAllLiveItems(WF_TIPOS_ESPACIO_COLLECTION_ID)
       : Promise.resolve([]),
     getCollectionDetails(espaciosCollectionId),
   ]);
@@ -255,6 +277,7 @@ async function getCachedData() {
     barriosById: buildBarriosMap(barrioItems),
     categoriasById: buildCategoriasMap(categoriaItems),
     caracteristicasById: buildCaracteristicasMap(caracteristicaItems),
+    tiposEspacioById: buildTiposEspacioMap(tipoEspacioItems),
     nivelPrecioOptions: buildOptionMap(nivelPrecioField),
     zonaOptions: buildOptionMap(zonaField),
   };
