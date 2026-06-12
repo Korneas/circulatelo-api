@@ -11,6 +11,10 @@ const WF_CATEGORY_BG_FIELD = process.env.WF_CATEGORY_BG_FIELD || "chip-light-col
 const WF_CATEGORY_TEXT_FIELD = process.env.WF_CATEGORY_TEXT_FIELD || "chip-strong-color";
 const WF_CATEGORY_PIN_FIELD = process.env.WF_CATEGORY_PIN_FIELD || "pin-color";
 
+// Fallback slugs used only if dynamic resolution can't find the date fields.
+const DEFAULT_START_DATE_SLUG = "fecha-de-inicio";
+const DEFAULT_END_DATE_SLUG = "fecha-de-final";
+
 let cachedCollectionId = null;
 
 async function webflowFetch(path, params = {}) {
@@ -64,6 +68,26 @@ async function getCollectionDetails(collectionId) {
 function getFieldBySlug(collectionDetails, slug) {
   const fields = collectionDetails?.fields || [];
   return fields.find((field) => field.slug === slug) || null;
+}
+
+// Webflow keeps a field's ORIGINAL api slug even after you rename it in the
+// editor, so the label shown in the UI ("fecha-de-final") is not guaranteed to
+// match the slug the API returns. Resolve the real slug from the collection's
+// field definitions by finding the DateTime field whose name/slug reads like a
+// start or end date, while ignoring the "pautado" promo dates. Falls back to
+// the provided default if nothing matches.
+function resolveDateFieldSlug(collectionDetails, includeTokens, fallbackSlug) {
+  const fields = collectionDetails?.fields || [];
+  const norm = (s) => String(s || "").toLowerCase();
+
+  const match = fields.find((field) => {
+    if (field.type !== "DateTime") return false;
+    const haystack = `${norm(field.displayName)} ${norm(field.slug)}`;
+    if (haystack.includes("pautado") || haystack.includes("promo")) return false;
+    return includeTokens.some((token) => haystack.includes(token));
+  });
+
+  return match?.slug || fallbackSlug;
 }
 
 function buildOptionMap(field) {
@@ -170,8 +194,12 @@ function isDateWithinRange(targetDate, startDate, endDate) {
 function normalizeEvent(item, refs = {}) {
   const f = item.fieldData || {};
 
-  const startDate = toDateOnly(f["fecha-de-inicio"]);
-  const endDate = toDateOnly(f["fecha-de-final"]);
+  // Use the dynamically resolved slugs (falling back to the Spanish defaults).
+  const startSlug = refs.startDateSlug || DEFAULT_START_DATE_SLUG;
+  const endSlug = refs.endDateSlug || DEFAULT_END_DATE_SLUG;
+
+  const startDate = toDateOnly(f[startSlug]);
+  const endDate = toDateOnly(f[endSlug]);
 
   const barrioId = f["barrio"] || "";
   const categoriaId = f["categoria-principal"] || "";
@@ -290,6 +318,36 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
     const month = searchParams.get("month");
+    const debug = searchParams.get("debug");
+
+    const eventsCollectionId = await getEventsCollectionId();
+
+    // The fields debug view only needs the collection schema, so handle it
+    // before we require a date/month and before fetching every item.
+    if (debug === "fields") {
+      const eventsCollectionDetails = await getCollectionDetails(eventsCollectionId);
+
+      const startDateSlug = resolveDateFieldSlug(
+        eventsCollectionDetails,
+        ["inicio", "comienzo", "start"],
+        DEFAULT_START_DATE_SLUG
+      );
+      const endDateSlug = resolveDateFieldSlug(
+        eventsCollectionDetails,
+        ["final", "fin", "termino", "end"],
+        DEFAULT_END_DATE_SLUG
+      );
+
+      return Response.json({
+        collectionId: eventsCollectionId,
+        resolved: { startDateSlug, endDateSlug },
+        fields: (eventsCollectionDetails.fields || []).map((field) => ({
+          slug: field.slug,
+          displayName: field.displayName,
+          type: field.type
+        }))
+      });
+    }
 
     if (!date && !month) {
       return Response.json(
@@ -297,8 +355,6 @@ export async function GET(request) {
         { status: 400 }
       );
     }
-
-    const eventsCollectionId = await getEventsCollectionId();
 
     const [eventItems, barrioItems, categoriaItems, eventsCollectionDetails] = await Promise.all([
       getAllLiveItems(eventsCollectionId),
@@ -316,13 +372,28 @@ export async function GET(request) {
     const valorOptionsById = buildOptionMap(valorField);
     const tipoEventoOptionsById = buildOptionMap(tipoEventoField);
 
+    // Resolve the real date-field slugs from the collection schema so a
+    // renamed field (whose api slug differs from its label) is still read.
+    const startDateSlug = resolveDateFieldSlug(
+      eventsCollectionDetails,
+      ["inicio", "comienzo", "start"],
+      DEFAULT_START_DATE_SLUG
+    );
+    const endDateSlug = resolveDateFieldSlug(
+      eventsCollectionDetails,
+      ["final", "fin", "termino", "end"],
+      DEFAULT_END_DATE_SLUG
+    );
+
     const events = eventItems
       .map((item) =>
         normalizeEvent(item, {
           barriosById,
           categoriasById,
           valorOptionsById,
-          tipoEventoOptionsById
+          tipoEventoOptionsById,
+          startDateSlug,
+          endDateSlug
         })
       )
       .filter((event) => event.startDate);
